@@ -161,10 +161,13 @@ if __name__ == '__main__':
     callback_list.append((lr_monitor_cb))
 
     # initialize trainer
+    # Note: PyTorch Lightning 2.x uses 'accelerator' and 'devices' instead of 'gpus'
+    accelerator = 'gpu' if train_on_gpu else 'cpu'
+    devices = gpu_id if train_on_gpu else 'auto'
     trainer = pl.Trainer(max_epochs=max_epochs, callbacks=callback_list,
                          logger=tb_logger, precision=32, gradient_clip_val=dnn_optim_dic['gradient_clip_val'],
                          check_val_every_n_epoch=check_val_every_n_epoch,
-                         gpus=gpu_id, auto_select_gpus=auto_select_gpus)
+                         accelerator=accelerator, devices=devices)
 
     #######################
     # training

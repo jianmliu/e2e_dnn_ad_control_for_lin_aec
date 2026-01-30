@@ -213,10 +213,18 @@ class frontend(pl.LightningModule):
         # logging
         self.logger.experiment.add_scalar('train_loss_mini_batch', loss_res_dic['loss'], self.global_step)      # use self.logger.experiment.add_scalar to set x-value of plot
 
+        # Store outputs for epoch end (PyTorch Lightning 2.x compatibility)
+        if not hasattr(self, '_training_step_outputs'):
+            self._training_step_outputs = []
+        self._training_step_outputs.append(loss_res_dic)
+
         return loss_res_dic
 
-    def training_epoch_end(self, outputs):
+    def on_train_epoch_end(self):
         """Runs at the end of every training epoch."""
+        outputs = self._training_step_outputs
+        if not outputs:
+            return
 
         for loss_name in outputs[0].keys():
             # compute average loss of one epoch
@@ -226,7 +234,7 @@ class frontend(pl.LightningModule):
             self.logger.experiment.add_scalar('avg_train_' + loss_name + '_epoch', avg_loss_epoch, self.current_epoch)  # use self.logger.experiment.add_scalar to set x-value of plot
             self.log('avg_train_' + loss_name + '_epoch_log', avg_loss_epoch, logger=False)                             # use self.log as it is needed for early stopping
 
-        return None
+        self._training_step_outputs.clear()
 
     # validation
     def validation_step(self, data_batch, batch_idx):
@@ -249,10 +257,18 @@ class frontend(pl.LightningModule):
         # setting validation flag
         self.val_mode = False
 
+        # Store outputs for epoch end (PyTorch Lightning 2.x compatibility)
+        if not hasattr(self, '_validation_step_outputs'):
+            self._validation_step_outputs = []
+        self._validation_step_outputs.append(loss_res_dic)
+
         return loss_res_dic
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         """Runs at the end of every validation epoch."""
+        outputs = self._validation_step_outputs
+        if not outputs:
+            return
 
         for loss_name in outputs[0].keys():
             # compute average loss of one epoch
@@ -265,7 +281,7 @@ class frontend(pl.LightningModule):
             else:
                 self.log('avg_val_' + loss_name + '_epoch_log', avg_loss_epoch, logger=False)                   # use self.log as it is needed for early stopping
 
-        return None
+        self._validation_step_outputs.clear()
 
     def test_step(self, data, batch_idx):
         raise Exception('Use "eval_dataset() or eval_sig() for evaluation of a complete data set or a single sequence!')
