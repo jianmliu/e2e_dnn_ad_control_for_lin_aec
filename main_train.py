@@ -25,8 +25,8 @@ if __name__ == '__main__':
     #######################
     # flags
     debugging_mode = False                                          # num_workers is set to 0 which simplifies debugging
-    train_on_gpu = False                                            # process training data on GPU
-    test_on_gpu = False                                             # process test data on GPU
+    train_on_gpu = True                                             # process training data on GPU (MPS on Mac)
+    test_on_gpu = True                                              # process test data on GPU (MPS on Mac)
 
     # testing
     test_data_path = os.path.join('data', 'test_data.h5')           # path to HDF5 test data
@@ -162,8 +162,18 @@ if __name__ == '__main__':
 
     # initialize trainer
     # Note: PyTorch Lightning 2.x uses 'accelerator' and 'devices' instead of 'gpus'
-    accelerator = 'gpu' if train_on_gpu else 'cpu'
-    devices = gpu_id if train_on_gpu else 'auto'
+    # Use 'mps' for Apple Silicon (M1/M2/M3/M4) GPU acceleration
+    import platform
+    if train_on_gpu:
+        if platform.system() == 'Darwin' and torch.backends.mps.is_available():
+            accelerator = 'mps'
+            devices = 1
+        else:
+            accelerator = 'gpu'
+            devices = gpu_id
+    else:
+        accelerator = 'cpu'
+        devices = 'auto'
     trainer = pl.Trainer(max_epochs=max_epochs, callbacks=callback_list,
                          logger=tb_logger, precision=32, gradient_clip_val=dnn_optim_dic['gradient_clip_val'],
                          check_val_every_n_epoch=check_val_every_n_epoch,
@@ -182,7 +192,11 @@ if __name__ == '__main__':
     model_best = class_frontend.frontend.load_from_checkpoint(checkpoint_path=ckpt_path)
 
     if test_on_gpu:
-        model_best.to('cuda')
+        # Use MPS for Apple Silicon, CUDA for NVIDIA
+        if platform.system() == 'Darwin' and torch.backends.mps.is_available():
+            model_best.to('mps')
+        else:
+            model_best.to('cuda')
         model_best.to_device()
     else:
         model_best.to('cpu')
